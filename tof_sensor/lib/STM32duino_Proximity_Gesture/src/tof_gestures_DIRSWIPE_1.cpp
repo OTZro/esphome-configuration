@@ -39,13 +39,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //int tof_gestures_initDIRSWIPE_1(int32_t rangeThreshold_mm, long minSwipeDuration, long maxSwipeDuration, Gesture_DIRSWIPE_1_Data_t *data){
 int tof_gestures_initDIRSWIPE_1(int32_t rangeThreshold_mm, long minSwipeDuration, long maxSwipeDuration, bool handMustCoverBoth, Gesture_DIRSWIPE_1_Data_t *data) {
 
-	int status=0;
+    int status=0;
     // Init left and right motion
     status |= tof_initMotion(rangeThreshold_mm, &(data->motionDetectorLeft));
     status |= tof_initMotion(rangeThreshold_mm, &(data->motionDetectorRight));
     data->minSwipeDuration = minSwipeDuration;
     data->maxSwipeDuration = maxSwipeDuration;
-	data->handMustCoverBoth = handMustCoverBoth;
+    data->handMustCoverBoth = handMustCoverBoth;
     data->state = GESTURES_DIRSWIPE_START;
     data->timestamp = 0;
     data->gesture_start_from_right = -1;
@@ -67,46 +67,59 @@ int tof_gestures_detectDIRSWIPE_1(int32_t left_range_mm, int32_t right_range_mm,
     switch(data->state){
         case GESTURES_DIRSWIPE_START:
 //            if(((l_motion_code == GESTURES_MOTION_DOWN_STATE) || (l_motion_code == GESTURES_MOTION_DROP_DOWN)) && r_motion_code == GESTURES_MOTION_RAISE_UP){
-			if ((!data->handMustCoverBoth && r_motion_code == GESTURES_MOTION_RAISE_UP) || (data->handMustCoverBoth && r_motion_code == GESTURES_MOTION_RAISE_UP && l_motion_code == GESTURES_MOTION_DOWN_STATE)) {
-				if(data->motionDetectorRight.duration > data->minSwipeDuration){
+            if ((!data->handMustCoverBoth && r_motion_code == GESTURES_MOTION_DROP_DOWN)) {
+                if(data->motionDetectorRight.duration > data->minSwipeDuration){
                     data->gesture_start_from_right = 1;
                     data->state = GESTURES_DIRSWIPE_END;
                     data->timestamp = timestamp;
- //                   TOF_GESTURES_DEBUG(DIRSWIPE_1,"Start right to left (%d ms)",data->motionDetectorRight.duration);
+                    // TOF_GESTURES_DEBUG(DIRSWIPE_1,"Start right to left (%d ms)",data->motionDetectorRight.duration);
                 }else{
                     return_code = GESTURES_DISCARDED_TOO_FAST;
                 }
 //            }else if(((r_motion_code == GESTURES_MOTION_DOWN_STATE) || (r_motion_code == GESTURES_MOTION_DROP_DOWN)) && l_motion_code == GESTURES_MOTION_RAISE_UP){
-			}else if ((!data->handMustCoverBoth && l_motion_code == GESTURES_MOTION_RAISE_UP) || (data->handMustCoverBoth && r_motion_code == GESTURES_MOTION_DOWN_STATE && l_motion_code == GESTURES_MOTION_RAISE_UP)) {
+            }else if ((!data->handMustCoverBoth && l_motion_code == GESTURES_MOTION_DROP_DOWN)) {
 
-				if(data->motionDetectorRight.duration > data->minSwipeDuration){
+                if(data->motionDetectorRight.duration > data->minSwipeDuration){
                     data->gesture_start_from_right = 0;
                     data->state = GESTURES_DIRSWIPE_END;
                     data->timestamp = timestamp;
- //                   TOF_GESTURES_DEBUG(DIRSWIPE_1,"Start left to right(%d ms)",data->motionDetectorRight.duration);
+                    // TOF_GESTURES_DEBUG(DIRSWIPE_1,"Start left to right(%d ms)",data->motionDetectorRight.duration);
                 }else{
                     return_code = GESTURES_DISCARDED_TOO_FAST;
                 }
-            }   
+            }
             break;
         case GESTURES_DIRSWIPE_END:
             duration = timestamp - data->timestamp;
+            // TOF_GESTURES_DEBUG(DIRSWIPE_1, "From right:%d, R motion: %d, L motion: %d", data->gesture_start_from_right, r_motion_code, l_motion_code);
             if(duration > data->maxSwipeDuration){
                 // Gesture is too long : discard it
                 data->state = GESTURES_DIRSWIPE_START;
                 data->gesture_start_from_right = -1;
- //               TOF_GESTURES_DEBUG(DIRSWIPE_1,"Too slow");
+                // TOF_GESTURES_DEBUG(DIRSWIPE_1,"Too slow");
                 return_code = GESTURES_DISCARDED_TOO_SLOW;
-            }else if ((data->gesture_start_from_right == 1 && l_motion_code == GESTURES_MOTION_RAISE_UP && r_motion_code == GESTURES_MOTION_UP_STATE) || (data->gesture_start_from_right == 0 && r_motion_code == GESTURES_MOTION_RAISE_UP && l_motion_code == GESTURES_MOTION_UP_STATE)){
+            }else if (
+                (data->gesture_start_from_right == 1 && r_motion_code == GESTURES_MOTION_RAISE_UP && l_motion_code == GESTURES_MOTION_UP_STATE) || 
+                (data->gesture_start_from_right == 0 && l_motion_code == GESTURES_MOTION_RAISE_UP && r_motion_code == GESTURES_MOTION_UP_STATE)
+            ) {
+                // Wrong direction, just skip it
+                data->state = GESTURES_DIRSWIPE_START;
+                data->gesture_start_from_right = -1;
+                // TOF_GESTURES_DEBUG(DIRSWIPE_1,"Wrong direction");
+                return_code = GESTURES_DISCARDED;
+            }else if (
+                (data->gesture_start_from_right == 1 && l_motion_code == GESTURES_MOTION_RAISE_UP && r_motion_code == GESTURES_MOTION_UP_STATE) || 
+                (data->gesture_start_from_right == 0 && r_motion_code == GESTURES_MOTION_RAISE_UP && l_motion_code == GESTURES_MOTION_UP_STATE)
+            ){
                 // Gesture detected
                 data->state = GESTURES_DIRSWIPE_START;
                 return_code = (data->gesture_start_from_right) ? GESTURES_SWIPE_RIGHT_LEFT : GESTURES_SWIPE_LEFT_RIGHT;
- //               TOF_GESTURES_DEBUG(DIRSWIPE_1,"DETECTED");
+                // TOF_GESTURES_DEBUG(DIRSWIPE_1,"DETECTED");
             }else{
                 // Waiting...
  //               TOF_GESTURES_DEBUG(DIRSWIPE_1,"Waiting...");
                 return_code = GESTURES_STARTED;
-            }             
+            }
             break;
     }
     return return_code;
